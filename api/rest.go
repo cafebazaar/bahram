@@ -4,13 +4,15 @@ import (
 	"net/http"
 
 	grest "github.com/ant0ine/go-json-rest/rest"
+	"github.com/cafebazaar/bahram/datasource"
 )
 
 type restServerAPI struct {
 	rest *grest.Api
+	ds   datasource.DataSource
 }
 
-func newRestServerAPI() *restServerAPI {
+func newRestServerAPI(datasource datasource.DataSource) *restServerAPI {
 	rest := grest.NewApi()
 	rest.Use(grest.DefaultDevStack...)
 	rest.Use(&grest.CorsMiddleware{
@@ -29,6 +31,7 @@ func newRestServerAPI() *restServerAPI {
 
 	return &restServerAPI{
 		rest: rest,
+		ds:   datasource,
 	}
 }
 

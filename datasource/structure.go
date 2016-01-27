@@ -1,8 +1,13 @@
 package datasource // import "github.com/cafebazaar/bahram/datasource"
 
+const (
+	debugTag = "DATASOURCE"
+)
+
 type User interface {
-	Groups() ([]Group, error)
 	InboxAddress() string
+	UID() string
+	Info() map[string]string
 }
 
 type Group interface {
@@ -10,7 +15,7 @@ type Group interface {
 }
 
 type DataSource interface {
-	UserByID(id string) (User, error)
+	CreateUser(active bool, values map[string]string) (User, error)
 	UserByEmail(emailAddress string) (User, error)
 	GroupByEmail(emailAddress string) (Group, error)
 }
