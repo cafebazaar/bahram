@@ -63,25 +63,23 @@ func main() {
 	var ldapAddr = net.TCPAddr{IP: net.IPv4zero, Port: 389}
 	var smtpAddr = net.TCPAddr{IP: net.IPv4zero, Port: 25}
 
-	go func() {
-		logging.RecordLogs(log.New(os.Stderr, "", log.LstdFlags), *debugFlag)
-	}()
-
 	// serving api
 	go func() {
 		err := api.Serve(apiAddr, etcdDataSource)
-		log.Fatalf("\nError while serving api: %s\n", err)
+		log.Fatalf("Error while serving api: %s\n", err)
 	}()
 
 	// serving ldap
 	go func() {
 		err := ldap.Serve(ldapAddr, etcdDataSource)
-		log.Fatalf("\nError while serving ldap: %s\n", err)
+		log.Fatalf("Error while serving ldap: %s\n", err)
 	}()
 
 	// serving smtp
 	go func() {
 		err := smtp.Serve(smtpAddr, etcdDataSource)
-		log.Fatalf("\nError while serving smtp: %s\n", err)
+		log.Fatalf("Error while serving smtp: %s\n", err)
 	}()
+
+	logging.RecordLogs(log.New(os.Stderr, "", log.LstdFlags), *debugFlag)
 }
