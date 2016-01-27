@@ -1,23 +1,29 @@
-package datasource // import "github.com/cafebazaar/bahram/datasource"
+package datasource
 
 import (
 	etcd "github.com/coreos/etcd/client"
 )
 
-type User interface {
-	Groups() []Group
+type EtcdDataSource struct {
+	keysAPI etcd.KeysAPI
 }
 
-type Group interface {
-	Users() []User
+func NewEtcdDataSource(kapi etcd.KeysAPI) (DataSource, error) {
+	instance := &EtcdDataSource{
+		keysAPI: kapi,
+	}
+
+	return instance, nil
 }
 
-type DataSource interface {
-	UserByID(id string) User
-	UserByEmail(emailAddress string) User
-	GroupByEmail(emailAddress string) Group
+func (ds *EtcdDataSource) UserByID(id string) (User, error) {
+	return nil, nil
 }
 
-func NewEtcdDataSource(kapi etcd.KeysAPI, client etcd.Client) (DataSource, error) {
+func (ds *EtcdDataSource) UserByEmail(emailAddress string) (User, error) {
+	return nil, nil
+}
+
+func (ds *EtcdDataSource) GroupByEmail(emailAddress string) (Group, error) {
 	return nil, nil
 }

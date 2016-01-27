@@ -6,13 +6,15 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/cafebazaar/bahram/api"
 	"github.com/cafebazaar/bahram/datasource"
 	"github.com/cafebazaar/bahram/ldap"
 	"github.com/cafebazaar/bahram/smtp"
 	"github.com/cafebazaar/blacksmith/logging"
-	//	etcd "github.com/coreos/etcd/client"
+	etcd "github.com/coreos/etcd/client"
 )
 
 const (
@@ -22,6 +24,8 @@ const (
 var (
 	versionFlag = flag.Bool("version", false, "Print version info and exit")
 	debugFlag   = flag.Bool("debug", false, "Log more things that aren't directly related to booting a recognized client")
+	etcdFlag    = flag.String("etcd", "", "Etcd endpoints")
+	etcdDirFlag = flag.String("etcd-dir", "bahram", "Etcd path prefixe")
 
 	version   string
 	commit    string
@@ -53,7 +57,28 @@ func main() {
 		os.Exit(0)
 	}
 
-	etcdDataSource, err := datasource.NewEtcdDataSource(nil, nil)
+	// etcd config
+	if *etcdFlag == "" || *etcdDirFlag == "" {
+		// fmt.Fprint(os.Stderr, "\nPlease specify the etcd endpoints and prefix\n")
+		// os.Exit(1)
+		// TODO: remove these
+		e1 := "http://192.168.100.103:2379"
+		e2 := "bahram"
+		etcdFlag = &e1
+		etcdDirFlag = &e2
+	}
+
+	etcdClient, err := etcd.New(etcd.Config{
+		Endpoints:               strings.Split(*etcdFlag, ","),
+		HeaderTimeoutPerRequest: 5 * time.Second,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "\nCouldn't create etcd connection: %s\n", err)
+		os.Exit(1)
+	}
+	kapi := etcd.NewKeysAPIWithPrefix(etcdClient, *etcdDirFlag)
+
+	etcdDataSource, err := datasource.NewEtcdDataSource(kapi)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "\nCouldn't create datasource: %s\n", err)
 		os.Exit(1)
@@ -63,22 +88,21 @@ func main() {
 	var ldapAddr = net.TCPAddr{IP: net.IPv4zero, Port: 389}
 	var smtpAddr = net.TCPAddr{IP: net.IPv4zero, Port: 25}
 
-	// serving api
 	go func() {
 		err := api.Serve(apiAddr, etcdDataSource)
 		log.Fatalf("Error while serving api: %s\n", err)
 	}()
 
-	// serving ldap
 	go func() {
 		err := ldap.Serve(ldapAddr, etcdDataSource)
-		log.Fatalf("Error while serving ldap: %s\n", err)
+		// log.Fatalf("Error while serving ldap: %s\n", err)
+		log.Printf("Error while serving ldap: %s\n", err)
 	}()
 
-	// serving smtp
 	go func() {
 		err := smtp.Serve(smtpAddr, etcdDataSource)
-		log.Fatalf("Error while serving smtp: %s\n", err)
+		// log.Fatalf("Error while serving smtp: %s\n", err)
+		log.Printf("Error while serving smtp: %s\n", err)
 	}()
 
 	logging.RecordLogs(log.New(os.Stderr, "", log.LstdFlags), *debugFlag)
