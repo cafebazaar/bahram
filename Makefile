@@ -1,3 +1,4 @@
+PLATFORM_ARGS ?= GOOS=linux GOARCH=amd64
 VERSION ?= $(shell git describe --tags)
 COMMIT := $(shell git rev-parse HEAD)
 BUILD_TIME := $(shell LANG=en_US date +"%F_%T_%z")
@@ -16,9 +17,9 @@ test: *.go */*.go
 	go get -t -v ./...
 	go test -v ./...
 
-bahram: *.go
+bahram: *.go */*.go
 	go get -v
-	GOOS=linux GOARCH=amd64 go build -ldflags "-s -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildTime=$(BUILD_TIME)" -o bahram
+	$(PLATFORM_ARGS) go build -ldflags "-s -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildTime=$(BUILD_TIME)" -o bahram
 
 clean:
 	rm -rf bahram
