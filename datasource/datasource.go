@@ -94,25 +94,7 @@ func (ds *EtcdDataSource) UserByEmail(emailAddress string) (User, error) {
 	return userFromNodeValue(ds, response.Node.Value)
 }
 
-func (ds *EtcdDataSource) CreateGroup(emailAddress, name, manager string) (Group, error) {
-	if emailAddress == "" || name == "" || manager == "" {
-		return nil, errors.New("emailAddress, name, and manager is required.")
-	}
-
-	_, err := ds.UserByEmail(emailAddress)
-	if err == nil {
-		return nil, errors.New("A user with this email already exists")
-	}
-
-	_, err = ds.GroupByEmail(emailAddress)
-	if err == nil {
-		return nil, errors.New("A group with this email already exists")
-	}
-
-	return group(ds, emailAddress, name, manager)
-}
-
-func (ds *EtcdDataSource) StoreGroup(g Group) error {
+func (ds *EtcdDataSource) StoreGroup(g *Group) error {
 	groupJSON, err := json.Marshal(g)
 	if err != nil {
 		return err
@@ -129,7 +111,7 @@ func (ds *EtcdDataSource) StoreGroup(g Group) error {
 	return nil
 }
 
-func (ds *EtcdDataSource) GroupByEmail(emailAddress string) (Group, error) {
+func (ds *EtcdDataSource) GroupByEmail(emailAddress string) (*Group, error) {
 	// TODO: use ds.cache
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -140,7 +122,7 @@ func (ds *EtcdDataSource) GroupByEmail(emailAddress string) (Group, error) {
 		return nil, err
 	}
 
-	return groupFromNodeValue(ds, response.Node.Value)
+	return groupFromNodeValue(response.Node.Value)
 }
 
 func (ds *EtcdDataSource) Groups() ([]Group, error) {
