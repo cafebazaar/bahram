@@ -20,14 +20,18 @@ type User interface {
 }
 
 type Group interface {
-	Users() ([]User, error)
+	EmailAddress() string
+	MembersList() []string
 }
 
 type DataSource interface {
 	CreateUser(emailAddress, uid, inboxAddress string) (User, error)
 	StoreUser(u User) error
 	UserByEmail(emailAddress string) (User, error)
+	CreateGroup(emailAddress, name, manager string) (Group, error)
+	StoreGroup(g Group) error
 	GroupByEmail(emailAddress string) (Group, error)
+	Groups() ([]Group, error)
 	ConfigString(name string) string
 	ConfigByteArray(name string) []byte
 }

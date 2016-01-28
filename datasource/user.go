@@ -1,4 +1,4 @@
-package datasource // import "github.com/cafebazaar/bahram/datasource"
+package datasource
 
 import (
 	"encoding/base64"
@@ -36,6 +36,18 @@ func userFromNodeValue(ds DataSource, value string) (User, error) {
 	err := json.Unmarshal([]byte(value), &u)
 	u.ds = ds
 	return &u, err
+}
+
+func user(ds DataSource, emailAddress, uid, inboxAddress string) (User, error) {
+	// TODO Validation?
+	return &userImpl{
+		ds:        ds,
+		Email:     emailAddress,
+		UIDStr:    uid,
+		InboxAddr: inboxAddress,
+		Active:    true,  // default value
+		Admin:     false, // default value
+	}, nil
 }
 
 func (u *userImpl) EmailAddress() string {
@@ -130,22 +142,35 @@ func (u *userImpl) HasPassword() bool {
 	return u.Password != ""
 }
 
-func (u *userImpl) encodePassword(plainPassword string) (string, error) {
+func (u *userImpl) encodePassword(plainPassword string) ([]byte, error) {
 	password, err := scrypt.Key([]byte(plainPassword), u.ds.ConfigByteArray("PASSWORD_SALT"), 16384, 8, 1, 32)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return base64.StdEncoding.EncodeToString(password), nil
+	return password, nil
 }
 
 func (u *userImpl) AcceptsPassword(plainPassword string) bool {
-	encodedPassword, err := u.encodePassword(plainPassword)
+	encodedInputPassword, err := u.encodePassword(plainPassword)
 	if err != nil {
 		logging.Debug(debugTag, "Error while encodePassword: %s", err)
 		return false
 	}
-	if encodedPassword != u.Password {
+
+	userPassword, err := base64.StdEncoding.DecodeString(u.Password)
+	if err != nil {
 		return false
+	}
+	if userPassword == nil || encodedInputPassword == nil {
+		return false
+	}
+	if len(userPassword) != len(encodedInputPassword) {
+		return false
+	}
+	for i := range userPassword {
+		if userPassword[i] != encodedInputPassword[i] {
+			return false
+		}
 	}
 	return true
 }
@@ -155,7 +180,7 @@ func (u *userImpl) SetPassword(plainPassword string) error {
 	if err != nil {
 		return err
 	}
-	u.Password = encodedPassword
+	u.Password = base64.StdEncoding.EncodeToString(encodedPassword)
 	return nil
 }
 
