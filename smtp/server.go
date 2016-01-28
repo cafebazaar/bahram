@@ -137,7 +137,7 @@ func Serve(listenAddr net.TCPAddr, datasource datasource.DataSource) error {
 			clientId:    clientId,
 			savedNotify: make(chan int),
 		}
-		go handleClient(client)
+		go handleClient(client, datasource)
 		clientId++
 	}
 
@@ -171,7 +171,24 @@ func procMail() {
 	}
 }
 
-func handleClient(client *Client) {
+func clientAuth(client *Client, datasource datasource.DataSource) string {
+	succ := "235 Authentication succeeded"
+	fail := "535 Authentication failed"
+
+	user, err := datasource.UserByEmail(client.username)
+	if err != nil {
+		return fail
+	}
+
+	logln(1, user.EmailAddress())
+	logln(1, client.password)
+	if user.AcceptsPassword(client.password) {
+		return succ
+	}
+	return fail
+}
+
+func handleClient(client *Client, datasource datasource.DataSource) {
 	defer closeClient(client)
 	//	defer closeClient(client)
 	greeting := "220 " + gConfig["GSMTP_HOST_NAME"] +
@@ -207,7 +224,9 @@ func handleClient(client *Client) {
 				}
 				client.password = string(dec)
 				passInput = false
-				responseAdd(client, "235 Authentication succeeded")
+				resp := clientAuth(client, datasource)
+				responseAdd(client, resp)
+
 			case strings.Index(cmd, "HELO") == 0:
 				if len(input) > 5 {
 					client.helo = input[5:]
