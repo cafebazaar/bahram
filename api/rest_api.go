@@ -1,22 +1,23 @@
 package api
 
 import (
-	"fmt"
+	"net/http"
 
-	"github.com/ant0ine/go-json-rest/rest"
+	grest "github.com/ant0ine/go-json-rest/rest"
 )
 
 // Returns information about current user
-func (r *restServerAPI) Me(w rest.ResponseWriter, req *rest.Request) {
+func (r *restServerAPI) Me(w grest.ResponseWriter, req *grest.Request) {
 	//	values := map[string]string{
 	//		"email":        "reza@cafebazaar.ir",
 	//		"uid":          "reza",
 	//		"inboxAddress": "remohammadi@gmail.com",
 	//	}
 	//	user, err := r.ds.CreateUser(true, values)
-	user, err := r.ds.UserByEmail("reza@cafebazaar.ir")
+	user, err := r.ds.UserByEmail(req.Env["REMOTE_USER"].(string))
 	if err != nil {
-		w.WriteJson(fmt.Sprintf(`{"error": %q}`, err))
+		grest.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	w.WriteJson(user)
+	w.WriteJson(user.Info())
 }

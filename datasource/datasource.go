@@ -1,10 +1,11 @@
 package datasource
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
+	"os"
 	"time"
 
 	"github.com/cafebazaar/blacksmith/logging"
@@ -29,76 +30,52 @@ func NewEtcdDataSource(kapi etcd.KeysAPI, etcdDir string) (DataSource, error) {
 	return instance, nil
 }
 
-func (ds *EtcdDataSource) CreateUser(active bool, values map[string]string) (User, error) {
+func (ds *EtcdDataSource) ConfigString(name string) string {
+	return os.Getenv(fmt.Sprintf("BAHRAM_%s", name))
+}
 
-	email, ok := values["email"]
-	if !ok {
-		return nil, errors.New("email is a required field in the values")
+func (ds *EtcdDataSource) ConfigByteArray(name string) []byte {
+	base64Value := ds.ConfigString(name)
+	value, err := base64.StdEncoding.DecodeString(base64Value)
+	if err != nil {
+		logging.Log(debugTag, "Error while decoding config value %s: %s", name, err)
+		return nil
+	}
+	return value
+}
+
+func (ds *EtcdDataSource) CreateUser(emailAddress, uid, inboxAddress string) (User, error) {
+
+	if emailAddress == "" || uid == "" || inboxAddress == "" {
+		return nil, errors.New("emailAddress, uid, and inboxAddress is required.")
 	}
 
-	uid, ok := values["uid"]
-	if !ok {
-		return nil, errors.New("uid is a required field in the values")
-	}
-
-	inboxAddress, ok := values["inboxAddress"]
-	if !ok {
-		return nil, errors.New("inboxAddress is a required field in the values")
-	}
+	// TODO Validation?
 
 	u := &userImpl{
-		Email:        email,
-		UIDStr:       uid,
-		InboxAddr:    inboxAddress,
-		Active:       active,
-		EnFirstName:  values["enFirstName"],
-		EnLastName:   values["enLastName"],
-		FaFirstName:  values["faFirstName"],
-		FaLastName:   values["faLastName"],
-		MobileNum:    values["mobileNum"],
-		EmergencyNum: values["emergencyNum"],
+		Email:     emailAddress,
+		UIDStr:    uid,
+		InboxAddr: inboxAddress,
 	}
 
-	var err error
+	return u, nil
+}
 
-	birthDateStr, ok := values["birthDate"]
-	if ok {
-		u.BirthDate, err = strconv.ParseUint(birthDateStr, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("error while parsing birthDate: %s", err)
-		}
-	}
-
-	enrolmentDateStr, ok := values["enrolmentDate"]
-	if ok {
-		u.EnrolmentDate, err = strconv.ParseUint(enrolmentDateStr, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("error while parsing enrolmentDate: %s", err)
-		}
-	}
-
-	leavingDateStr, ok := values["leavingDate"]
-	if ok {
-		u.LeavingDate, err = strconv.ParseUint(leavingDateStr, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("error while parsing leavingDate: %s", err)
-		}
-	}
-
+func (ds *EtcdDataSource) StoreUser(u User) error {
 	userJSON, err := json.Marshal(u)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	logging.Debug(debugTag, "Setting %s", userJSON)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_, err = ds.keysAPI.Set(ctx, fmt.Sprintf("/%s/users/%s", ds.etcdDir, email), string(userJSON[:]), nil)
+	_, err = ds.keysAPI.Set(ctx, fmt.Sprintf("/%s/users/%s", ds.etcdDir, u.EmailAddress()), string(userJSON[:]), nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return u, nil
+	return nil
 }
 
 func (ds *EtcdDataSource) UserByEmail(emailAddress string) (User, error) {

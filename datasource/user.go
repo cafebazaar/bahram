@@ -2,6 +2,7 @@ package datasource // import "github.com/cafebazaar/bahram/datasource"
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 )
 
@@ -10,6 +11,8 @@ type userImpl struct {
 	UIDStr        string `json:"uid,string"`
 	InboxAddr     string `json:"inboxAddress,string"`
 	Active        bool   `json:"active,bool"`
+	Admin         bool   `json:"admin,bool"`
+	Password      string `json:"password,string"`
 	EnFirstName   string `json:"enFirstName,string,omitempty"`
 	EnLastName    string `json:"enLastName,string,omitempty"`
 	FaFirstName   string `json:"faFirstName,string,omitempty"`
@@ -28,6 +31,10 @@ func userFromNodeValue(value string) (User, error) {
 	return &u, err
 }
 
+func (u *userImpl) EmailAddress() string {
+	return u.Email
+}
+
 func (u *userImpl) InboxAddress() string {
 	return u.InboxAddr
 }
@@ -36,8 +43,8 @@ func (u *userImpl) UID() string {
 	return u.UIDStr
 }
 
-func (u *userImpl) Info() map[string]string {
-	return map[string]string{
+func (u *userImpl) Info() map[string]interface{} {
+	return map[string]interface{}{
 		"email":         u.Email,
 		"uid":           u.UIDStr,
 		"enFirstName":   u.EnFirstName,
@@ -46,8 +53,92 @@ func (u *userImpl) Info() map[string]string {
 		"faLastName":    u.FaLastName,
 		"mobileNum":     u.MobileNum,
 		"emergencyNum":  u.EmergencyNum,
-		"birthDate":     strconv.FormatUint(u.BirthDate, 10),
-		"enrolmentDate": strconv.FormatUint(u.EnrolmentDate, 10),
-		"leavingDate":   strconv.FormatUint(u.LeavingDate, 10),
+		"birthDate":     u.BirthDate,
+		"enrolmentDate": u.EnrolmentDate,
+		"leavingDate":   u.LeavingDate,
 	}
+}
+
+func (u *userImpl) UpdateInfo(values map[string]string) error {
+	enFirstName, ok := values["enFirstName"]
+	if ok {
+		u.EnFirstName = enFirstName
+	}
+
+	enLastName, ok := values["enLastName"]
+	if ok {
+		u.EnLastName = enLastName
+	}
+
+	faFirstName, ok := values["faFirstName"]
+	if ok {
+		u.FaFirstName = faFirstName
+	}
+
+	faLastName, ok := values["faLastName"]
+	if ok {
+		u.FaLastName = faLastName
+	}
+
+	mobileNum, ok := values["mobileNum"]
+	if ok {
+		u.MobileNum = mobileNum
+	}
+
+	emergencyNum, ok := values["emergencyNum"]
+	if ok {
+		u.EmergencyNum = emergencyNum
+	}
+
+	var err error
+
+	birthDateStr, ok := values["birthDate"]
+	if ok {
+		u.BirthDate, err = strconv.ParseUint(birthDateStr, 10, 64)
+		if err != nil {
+			return fmt.Errorf("error while parsing birthDate: %s", err)
+		}
+	}
+
+	enrolmentDateStr, ok := values["enrolmentDate"]
+	if ok {
+		u.EnrolmentDate, err = strconv.ParseUint(enrolmentDateStr, 10, 64)
+		if err != nil {
+			return fmt.Errorf("error while parsing enrolmentDate: %s", err)
+		}
+	}
+
+	leavingDateStr, ok := values["leavingDate"]
+	if ok {
+		u.LeavingDate, err = strconv.ParseUint(leavingDateStr, 10, 64)
+		if err != nil {
+			return fmt.Errorf("error while parsing leavingDate: %s", err)
+		}
+	}
+
+	return nil
+}
+
+func (u *userImpl) AcceptsPassword(plainPassword string) bool {
+	return true
+}
+
+func (u *userImpl) SetPassword(plainPassword string) {
+
+}
+
+func (u *userImpl) IsActive() bool {
+	return u.Active
+}
+
+func (u *userImpl) SetActive(active bool) {
+	u.Active = active
+}
+
+func (u *userImpl) IsAdmin() bool {
+	return u.Admin
+}
+
+func (u *userImpl) SetAdmin(admin bool) {
+	u.Admin = admin
 }
