@@ -62,7 +62,7 @@ func main() {
 		// fmt.Fprint(os.Stderr, "\nPlease specify the etcd endpoints and prefix\n")
 		// os.Exit(1)
 		// TODO: remove these
-		e1 := "http://192.168.100.103:2379"
+		e1 := "http://aghajoon1.cafebazaar.ir:4001"
 		e2 := "bahram"
 		etcdFlag = &e1
 		etcdDirFlag = &e2
@@ -76,9 +76,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\nCouldn't create etcd connection: %s\n", err)
 		os.Exit(1)
 	}
-	kapi := etcd.NewKeysAPIWithPrefix(etcdClient, *etcdDirFlag)
+	kapi := etcd.NewKeysAPI(etcdClient)
 
-	etcdDataSource, err := datasource.NewEtcdDataSource(kapi)
+	etcdDataSource, err := datasource.NewEtcdDataSource(kapi, *etcdDirFlag)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "\nCouldn't create datasource: %s\n", err)
 		os.Exit(1)
