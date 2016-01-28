@@ -1,12 +1,18 @@
 package datasource // import "github.com/cafebazaar/bahram/datasource"
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strconv"
+
+	"github.com/cafebazaar/blacksmith/logging"
+	"golang.org/x/crypto/scrypt"
 )
 
 type userImpl struct {
+	ds DataSource
+
 	Email         string `json:"email,string"`
 	UIDStr        string `json:"uid,string"`
 	InboxAddr     string `json:"inboxAddress,string"`
@@ -25,9 +31,10 @@ type userImpl struct {
 	// Links         []string `json:"birthDate,array,omitempty"`
 }
 
-func userFromNodeValue(value string) (User, error) {
+func userFromNodeValue(ds DataSource, value string) (User, error) {
 	var u userImpl
 	err := json.Unmarshal([]byte(value), &u)
+	u.ds = ds
 	return &u, err
 }
 
@@ -119,12 +126,37 @@ func (u *userImpl) UpdateInfo(values map[string]string) error {
 	return nil
 }
 
+func (u *userImpl) HasPassword() bool {
+	return u.Password != ""
+}
+
+func (u *userImpl) encodePassword(plainPassword string) (string, error) {
+	password, err := scrypt.Key([]byte(plainPassword), u.ds.ConfigByteArray("PASSWORD_SALT"), 16384, 8, 1, 32)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(password), nil
+}
+
 func (u *userImpl) AcceptsPassword(plainPassword string) bool {
+	encodedPassword, err := u.encodePassword(plainPassword)
+	if err != nil {
+		logging.Debug(debugTag, "Error while encodePassword: %s", err)
+		return false
+	}
+	if encodedPassword != u.Password {
+		return false
+	}
 	return true
 }
 
-func (u *userImpl) SetPassword(plainPassword string) {
-
+func (u *userImpl) SetPassword(plainPassword string) error {
+	encodedPassword, err := u.encodePassword(plainPassword)
+	if err != nil {
+		return err
+	}
+	u.Password = encodedPassword
+	return nil
 }
 
 func (u *userImpl) IsActive() bool {

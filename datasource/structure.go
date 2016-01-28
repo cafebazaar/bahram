@@ -10,8 +10,9 @@ type User interface {
 	UID() string
 	Info() map[string]interface{}
 	UpdateInfo(values map[string]string) error
+	HasPassword() bool
 	AcceptsPassword(plainPassword string) bool
-	SetPassword(plainPassword string)
+	SetPassword(plainPassword string) error
 	IsActive() bool
 	SetActive(active bool)
 	IsAdmin() bool

@@ -50,9 +50,15 @@ func (ds *EtcdDataSource) CreateUser(emailAddress, uid, inboxAddress string) (Us
 		return nil, errors.New("emailAddress, uid, and inboxAddress is required.")
 	}
 
+	_, err := ds.UserByEmail(emailAddress)
+	if err == nil {
+		return nil, errors.New("A user with this email already exists")
+	}
+
 	// TODO Validation?
 
 	u := &userImpl{
+		ds:        ds,
 		Email:     emailAddress,
 		UIDStr:    uid,
 		InboxAddr: inboxAddress,
@@ -89,7 +95,7 @@ func (ds *EtcdDataSource) UserByEmail(emailAddress string) (User, error) {
 		return nil, err
 	}
 
-	return userFromNodeValue(response.Node.Value)
+	return userFromNodeValue(ds, response.Node.Value)
 }
 
 func (ds *EtcdDataSource) GroupByEmail(emailAddress string) (Group, error) {
