@@ -57,7 +57,7 @@ func (ds *DataSource) StoreUser(u *User) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_, err = ds.keysAPI.Set(ctx, fmt.Sprintf("/%s/users/%s", ds.etcdDir, u.EmailAddress()), string(userJSON[:]), nil)
+	_, err = ds.keysAPI.Set(ctx, fmt.Sprintf("/%s/users/%s", ds.etcdDir, u.Email), string(userJSON[:]), nil)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (ds *DataSource) StoreGroup(g *Group) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_, err = ds.keysAPI.Set(ctx, fmt.Sprintf("/%s/groups/%s", ds.etcdDir, g.EmailAddress()), string(groupJSON[:]), nil)
+	_, err = ds.keysAPI.Set(ctx, fmt.Sprintf("/%s/groups/%s", ds.etcdDir, g.Email), string(groupJSON[:]), nil)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,6 @@ func (ds *DataSource) GroupByEmail(emailAddress string) (*Group, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-
 	response, err := ds.keysAPI.Get(ctx, fmt.Sprintf("/%s/groups/%s", ds.etcdDir, emailAddress), nil)
 	if err != nil {
 		return nil, err
@@ -109,6 +108,30 @@ func (ds *DataSource) GroupByEmail(emailAddress string) (*Group, error) {
 	return groupFromNodeValue(response.Node.Value)
 }
 
-func (ds *DataSource) Groups() ([]Group, error) {
-	return nil, nil
+func (ds *DataSource) Groups() ([]*Group, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	response, err := ds.keysAPI.Get(ctx, fmt.Sprintf("/%s/groups", ds.etcdDir), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var groups []*Group
+
+	errCount := 0
+	for i := range response.Node.Nodes {
+		g, e := groupFromNodeValue(response.Node.Nodes[i].Value)
+		if e != nil {
+			errCount += 1
+			logging.Debug(debugTag, "Error while groupFromNodeValue: %s", e)
+		} else {
+			groups = append(groups, g)
+		}
+	}
+
+	if errCount > 0 {
+		return nil, fmt.Errorf("Errors happened while trying to unmarshal %d group(s)", errCount)
+	}
+
+	return groups, nil
 }

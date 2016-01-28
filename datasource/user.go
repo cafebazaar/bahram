@@ -3,29 +3,27 @@ package datasource
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
-	"strconv"
 
 	"github.com/cafebazaar/blacksmith/logging"
 	"golang.org/x/crypto/scrypt"
 )
 
 type User struct {
-	Email         string `json:"email,string"`
-	UIDStr        string `json:"uid,string"`
-	InboxAddr     string `json:"inboxAddress,string"`
-	Active        bool   `json:"active,bool"`
-	Admin         bool   `json:"admin,bool"`
-	Password      string `json:"password,string"`
-	EnFirstName   string `json:"enFirstName,string,omitempty"`
-	EnLastName    string `json:"enLastName,string,omitempty"`
-	FaFirstName   string `json:"faFirstName,string,omitempty"`
-	FaLastName    string `json:"faLastName,string,omitempty"`
-	MobileNum     string `json:"mobileNum,string,omitempty"`
-	EmergencyNum  string `json:"emergencyNum,string,omitempty"`
-	BirthDate     uint64 `json:"birthDate,string,omitempty"`
-	EnrolmentDate uint64 `json:"enrolmentDate,string,omitempty"`
-	LeavingDate   uint64 `json:"leavingDate,string,omitempty"`
+	Email         string `json:"email"`
+	UIDStr        string `json:"uid"`
+	InboxAddr     string `json:"inboxAddress"`
+	Active        bool   `json:"active,bool,omitempty"`
+	Admin         bool   `json:"admin,bool,omitempty"`
+	Password      string `json:"password,omitempty"`
+	EnFirstName   string `json:"enFirstName,omitempty"`
+	EnLastName    string `json:"enLastName,omitempty"`
+	FaFirstName   string `json:"faFirstName,omitempty"`
+	FaLastName    string `json:"faLastName,omitempty"`
+	MobileNum     string `json:"mobileNum,omitempty"`
+	EmergencyNum  string `json:"emergencyNum,omitempty"`
+	BirthDate     uint64 `json:"birthDate,omitempty"`
+	EnrolmentDate uint64 `json:"enrolmentDate,omitempty"`
+	LeavingDate   uint64 `json:"leavingDate,omitempty"`
 	// Links         []string `json:"birthDate,array,omitempty"`
 }
 
@@ -33,94 +31,6 @@ func userFromNodeValue(value string) (*User, error) {
 	var u User
 	err := json.Unmarshal([]byte(value), &u)
 	return &u, err
-}
-
-func (u *User) EmailAddress() string {
-	return u.Email
-}
-
-func (u *User) InboxAddress() string {
-	return u.InboxAddr
-}
-
-func (u *User) UID() string {
-	return u.UIDStr
-}
-
-func (u *User) Info() map[string]interface{} {
-	return map[string]interface{}{
-		"email":         u.Email,
-		"uid":           u.UIDStr,
-		"enFirstName":   u.EnFirstName,
-		"enLastName":    u.EnLastName,
-		"faFirstName":   u.FaFirstName,
-		"faLastName":    u.FaLastName,
-		"mobileNum":     u.MobileNum,
-		"emergencyNum":  u.EmergencyNum,
-		"birthDate":     u.BirthDate,
-		"enrolmentDate": u.EnrolmentDate,
-		"leavingDate":   u.LeavingDate,
-	}
-}
-
-func (u *User) UpdateInfo(values map[string]string) error {
-	enFirstName, ok := values["enFirstName"]
-	if ok {
-		u.EnFirstName = enFirstName
-	}
-
-	enLastName, ok := values["enLastName"]
-	if ok {
-		u.EnLastName = enLastName
-	}
-
-	faFirstName, ok := values["faFirstName"]
-	if ok {
-		u.FaFirstName = faFirstName
-	}
-
-	faLastName, ok := values["faLastName"]
-	if ok {
-		u.FaLastName = faLastName
-	}
-
-	mobileNum, ok := values["mobileNum"]
-	if ok {
-		u.MobileNum = mobileNum
-	}
-
-	emergencyNum, ok := values["emergencyNum"]
-	if ok {
-		u.EmergencyNum = emergencyNum
-	}
-
-	var err error
-
-	birthDateStr, ok := values["birthDate"]
-	if ok {
-		u.BirthDate, err = strconv.ParseUint(birthDateStr, 10, 64)
-		if err != nil {
-			return fmt.Errorf("error while parsing birthDate: %s", err)
-		}
-	}
-
-	enrolmentDateStr, ok := values["enrolmentDate"]
-	if ok {
-		u.EnrolmentDate, err = strconv.ParseUint(enrolmentDateStr, 10, 64)
-		if err != nil {
-			return fmt.Errorf("error while parsing enrolmentDate: %s", err)
-		}
-	}
-
-	leavingDateStr, ok := values["leavingDate"]
-	if ok {
-		u.LeavingDate, err = strconv.ParseUint(leavingDateStr, 10, 64)
-		if err != nil {
-			return fmt.Errorf("error while parsing leavingDate: %s", err)
-		}
-	}
-
-	return nil
 }
 
 func (u *User) HasPassword() bool {
@@ -167,20 +77,4 @@ func (u *User) SetPassword(plainPassword string, salt []byte) error {
 	}
 	u.Password = base64.StdEncoding.EncodeToString(encodedPassword)
 	return nil
-}
-
-func (u *User) IsActive() bool {
-	return u.Active
-}
-
-func (u *User) SetActive(active bool) {
-	u.Active = active
-}
-
-func (u *User) IsAdmin() bool {
-	return u.Admin
-}
-
-func (u *User) SetAdmin(admin bool) {
-	u.Admin = admin
 }

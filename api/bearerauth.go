@@ -47,6 +47,11 @@ func (mw *AuthBearerMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.Ha
 	return func(writer rest.ResponseWriter, request *rest.Request) {
 		authHeader := request.Header.Get("Authorization")
 
+		if request.Method == "OPTIONS" {
+			handler(writer, request)
+			return
+		}
+
 		// Authorization header was not provided
 		if authHeader == "" {
 			mw.unauthorized(writer)
