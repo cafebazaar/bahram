@@ -40,6 +40,8 @@ type Client struct {
 	data        string
 	subject     string
 	hash        string
+	username    string
+	password    string
 	time        int64
 	tls_on      bool
 	conn        net.Conn
@@ -52,6 +54,7 @@ type Client struct {
 }
 
 var gConfig = map[string]string{
+	"GSMTP_MAX_SIZE":       "131072",
 	"GSMTP_HOST_NAME":      "server.example.com", // This should also be set to reflect your RDNS
 	"GSMTP_PUB_KEY":        "/etc/ssl/certs/ssl-cert-snakeoil.pem",
 	"GSMTP_PRV_KEY":        "/etc/ssl/private/ssl-cert-snakeoil.key",
@@ -76,12 +79,17 @@ var max_size int // max email DATA size
 var timeout time.Duration
 var allowedHosts = make(map[string]bool, 15)
 
-func init() {
+func initVar() {
 	sem = make(chan int, 50)
 	SaveMailChan = make(chan *Client, 5)
 	timeout = time.Duration(10)
 	max_size = 131072
 	cert, err := tls.LoadX509KeyPair(gConfig["GSMTP_PUB_KEY"], gConfig["GSMTP_PRV_KEY"])
+
+	if err != nil {
+		logln(1, fmt.Sprintf("There was a problem with loading the certificate: %s", err))
+	}
+
 	TLSconfig = &tls.Config{Certificates: []tls.Certificate{cert}, ClientAuth: tls.VerifyClientCertIfGiven, ServerName: gConfig["GSMTP_HOST_NAME"]}
 	TLSconfig.Rand = rand.Reader
 	// map the allow hosts for easy lookup
@@ -93,7 +101,7 @@ func init() {
 }
 
 func Serve(listenAddr net.TCPAddr, datasource datasource.DataSource) error {
-	init()
+	initVar()
 
 	addr := listenAddr.String()
 
@@ -169,6 +177,7 @@ func handleClient(client *Client) {
 	greeting := "220 " + gConfig["GSMTP_HOST_NAME"] +
 		" SMTP Bahram-SMTPd #" + strconv.FormatInt(client.clientId, 10) + " (" + strconv.Itoa(len(sem)) + ") " + time.Now().Format(time.RFC1123Z)
 	advertiseTls := "250-STARTTLS\r\n"
+	passInput := false
 	for i := 0; i < 100; i++ {
 		switch client.state {
 		case 0:
@@ -191,6 +200,14 @@ func handleClient(client *Client) {
 			input = strings.Trim(input, " \n\r")
 			cmd := strings.ToUpper(input)
 			switch {
+			case passInput:
+				dec, err := base64.StdEncoding.DecodeString(input)
+				if err != nil {
+					return
+				}
+				client.password = string(dec)
+				passInput = false
+				responseAdd(client, "235 Authentication succeeded")
 			case strings.Index(cmd, "HELO") == 0:
 				if len(input) > 5 {
 					client.helo = input[5:]
@@ -200,7 +217,8 @@ func handleClient(client *Client) {
 				if len(input) > 5 {
 					client.helo = input[5:]
 				}
-				responseAdd(client, "250-"+gConfig["GSMTP_HOST_NAME"]+" Hello "+client.helo+"["+client.address+"]"+"\r\n"+"250-SIZE "+gConfig["GSMTP_MAX_SIZE"]+"\r\n"+advertiseTls+"250 HELP")
+				responseAdd(client, "250-"+gConfig["GSMTP_HOST_NAME"]+" Hello "+client.helo+"["+client.address+"]"+"\r\n"+"250-SIZE "+gConfig["GSMTP_MAX_SIZE"]+"\r\n"+advertiseTls+"250-AUTH LOGIN\r\n"+"250 HELP")
+
 			case strings.Index(cmd, "MAIL FROM:") == 0:
 				if len(input) > 10 {
 					client.mail_from = input[10:]
@@ -231,6 +249,15 @@ func handleClient(client *Client) {
 				responseAdd(client, "220 Ready to start TLS")
 				// go to start TLS state
 				client.state = 3
+			case strings.Index(cmd, "AUTH LOGIN") == 0:
+				tmp := input[11:]
+				dec, err := base64.StdEncoding.DecodeString(tmp)
+				if err != nil {
+					return
+				}
+				passInput = true
+				client.username = string(dec)
+				responseAdd(client, "334 UGFzc3dvcmQ6")
 			case strings.Index(cmd, "QUIT") == 0:
 				responseAdd(client, "221 Bye")
 				killClient(client)
