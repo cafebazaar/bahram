@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/cafebazaar/bahram/datasource"
 	"github.com/cafebazaar/blacksmith/logging"
+	"github.com/garyburd/redigo/redis"
 	"github.com/sloonz/go-iconv"
 	"github.com/sloonz/go-qprintable"
 )
@@ -28,6 +30,12 @@ import (
 const (
 	debugTag = "SMTP"
 )
+
+type redisClient struct {
+	count int
+	conn  redis.Conn
+	time  int
+}
 
 type Client struct {
 	state       int
@@ -44,6 +52,7 @@ type Client struct {
 	password    string
 	time        int64
 	tls_on      bool
+	auth        bool
 	conn        net.Conn
 	bufin       *bufio.Reader
 	bufout      *bufio.Writer
@@ -51,6 +60,14 @@ type Client struct {
 	errors      int
 	clientId    int64
 	savedNotify chan int
+}
+
+type ClientMessage struct {
+	From    string
+	To      string
+	Data    string
+	Subject string
+	Auth    bool
 }
 
 var gConfig = map[string]string{
@@ -115,6 +132,7 @@ func Serve(listenAddr net.TCPAddr, datasource datasource.DataSource) error {
 	for i := 0; i < 3; i++ {
 		go procMail()
 	}
+	go readFromQueue()
 
 	var clientId int64
 	clientId = 1
@@ -136,12 +154,51 @@ func Serve(listenAddr net.TCPAddr, datasource datasource.DataSource) error {
 			bufout:      bufio.NewWriter(conn),
 			clientId:    clientId,
 			savedNotify: make(chan int),
+			auth:        false,
 		}
 		go handleClient(client, datasource)
 		clientId++
 	}
 
 	return nil
+}
+
+func (c *redisClient) redisConnection() (err error) {
+	if c.count > 100 {
+		c.conn.Close()
+		c.count = 0
+	}
+	if c.count == 0 {
+		c.conn, err = redis.Dial("tcp", ":6379")
+		if err != nil {
+			// handle error
+			return err
+		}
+	}
+	return nil
+}
+
+func readFromQueue() {
+	for {
+		r := &redisClient{}
+		redis_err := r.redisConnection()
+		if redis_err == nil {
+			values, do_err := redis.Strings(r.conn.Do("LRANGE", "email_queue", 0, 1))
+			if do_err == nil {
+				if len(values) > 0 {
+					var msg ClientMessage
+					json.Unmarshal([]byte(values[0]), &msg)
+					logln(1, msg.From)
+				}
+				_, do_err = redis.Strings(r.conn.Do("LPOP", "email_queue"))
+			} else {
+				logln(1, fmt.Sprintf("Redis do error %s", do_err))
+			}
+		} else {
+			logln(1, "redis connection error")
+		}
+		time.Sleep(3000 * time.Millisecond)
+	}
 }
 
 func procMail() {
@@ -166,8 +223,30 @@ func procMail() {
 		client.subject = mimeHeaderDecode(client.subject)
 		client.hash = md5hex(to + client.mail_from + client.subject + strconv.FormatInt(time.Now().UnixNano(), 10))
 
-		logln(1, "Email saved "+client.hash+" len: "+strconv.Itoa(length))
-		client.savedNotify <- 1
+		redis := &redisClient{}
+		redis_err := redis.redisConnection()
+		if redis_err == nil {
+			msg := &ClientMessage{
+				From:    client.mail_from,
+				To:      client.rcpt_to,
+				Auth:    client.auth,
+				Data:    client.data,
+				Subject: client.subject,
+			}
+			tmp, _ := json.Marshal(msg)
+			_, do_err := redis.conn.Do("RPUSH", "email_queue", tmp)
+
+			if do_err == nil {
+				logln(1, "Email saved "+client.hash+" len: "+strconv.Itoa(length))
+				client.savedNotify <- 1
+			} else {
+				logln(1, "Redis do error")
+				client.savedNotify <- -1
+			}
+		} else {
+			logln(1, "redis connection error")
+			client.savedNotify <- -1
+		}
 	}
 }
 
@@ -183,6 +262,7 @@ func clientAuth(client *Client, datasource datasource.DataSource) string {
 	logln(1, user.EmailAddress())
 	logln(1, client.password)
 	if user.AcceptsPassword(client.password) {
+		client.auth = true
 		return succ
 	}
 	return fail
@@ -453,9 +533,9 @@ func validateEmailData(client *Client) (user string, host string, addr_err error
 	}
 	client.rcpt_to = user + "@" + host
 	// check if on allowed hosts
-	if allowed := allowedHosts[host]; !allowed {
+	/*if allowed := allowedHosts[host]; !allowed {
 		return user, host, errors.New("invalid host:" + host)
-	}
+	}*/
 	return user, host, addr_err
 }
 
