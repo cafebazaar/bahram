@@ -133,6 +133,7 @@ func Serve(listenAddr net.TCPAddr, datasource datasource.DataSource) error {
 		clientId++
 	}
 
+func Serve(listenAddr net.TCPAddr, datasource *datasource.DataSource) error {
 	return nil
 }
 
