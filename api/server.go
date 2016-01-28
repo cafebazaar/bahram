@@ -12,7 +12,7 @@ const (
 	debugTag = "API/SERVER"
 )
 
-func Serve(listenAddr net.TCPAddr, datasource datasource.DataSource) error {
+func Serve(listenAddr net.TCPAddr, datasource *datasource.DataSource) error {
 	logging.Log(debugTag, "Serving Rest API on %s", listenAddr)
 	restApi := newRestServerAPI(datasource)
 	handler, err := restApi.MakeHandler()

@@ -13,10 +13,10 @@ import (
 
 type restServerAPI struct {
 	rest *grest.Api
-	ds   datasource.DataSource
+	ds   *datasource.DataSource
 }
 
-func newRestServerAPI(datasource datasource.DataSource) *restServerAPI {
+func newRestServerAPI(datasource *datasource.DataSource) *restServerAPI {
 	rest := grest.NewApi()
 	rest.Use(grest.DefaultDevStack...)
 
@@ -101,7 +101,7 @@ func (r *restServerAPI) Login(w grest.ResponseWriter, req *grest.Request) {
 		grest.Error(w, "user/password failed", http.StatusBadRequest)
 		return
 	}
-	if !user.AcceptsPassword(up.Password) {
+	if !user.AcceptsPassword(up.Password, r.ds.ConfigByteArray("PASSWORD_SALT")) {
 		grest.Error(w, "user/password failed", http.StatusBadRequest)
 		return
 	}

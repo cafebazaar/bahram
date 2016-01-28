@@ -11,7 +11,6 @@ import (
 
 	"github.com/cafebazaar/bahram/api"
 	"github.com/cafebazaar/bahram/datasource"
-	"github.com/cafebazaar/bahram/ldap"
 	"github.com/cafebazaar/bahram/smtp"
 	"github.com/cafebazaar/blacksmith/logging"
 	etcd "github.com/coreos/etcd/client"
@@ -78,29 +77,22 @@ func main() {
 	}
 	kapi := etcd.NewKeysAPI(etcdClient)
 
-	etcdDataSource, err := datasource.NewEtcdDataSource(kapi, *etcdDirFlag)
+	dataSource, err := datasource.NewDataSource(kapi, *etcdDirFlag)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "\nCouldn't create datasource: %s\n", err)
 		os.Exit(1)
 	}
 
 	var apiAddr = net.TCPAddr{IP: net.IPv4zero, Port: 80}
-	var ldapAddr = net.TCPAddr{IP: net.IPv4zero, Port: 389}
 	var smtpAddr = net.TCPAddr{IP: net.IPv4zero, Port: 25}
 
 	go func() {
-		err := api.Serve(apiAddr, etcdDataSource)
+		err := api.Serve(apiAddr, dataSource)
 		log.Fatalf("Error while serving api: %s\n", err)
 	}()
 
 	go func() {
-		err := ldap.Serve(ldapAddr, etcdDataSource)
-		// log.Fatalf("Error while serving ldap: %s\n", err)
-		log.Printf("Error while serving ldap: %s\n", err)
-	}()
-
-	go func() {
-		err := smtp.Serve(smtpAddr, etcdDataSource)
+		err := smtp.Serve(smtpAddr, dataSource)
 		// log.Fatalf("Error while serving smtp: %s\n", err)
 		log.Printf("Error while serving smtp: %s\n", err)
 	}()

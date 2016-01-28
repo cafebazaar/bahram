@@ -1,9 +1,8 @@
-package datasource
+package datasource // import "github.com/cafebazaar/bahram/datasource"
 
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -14,14 +13,18 @@ import (
 	"golang.org/x/net/context"
 )
 
-type EtcdDataSource struct {
+const (
+	debugTag = "DATASOURCE"
+)
+
+type DataSource struct {
 	keysAPI etcd.KeysAPI
 	etcdDir string
 	cache   *cache.Cache
 }
 
-func NewEtcdDataSource(kapi etcd.KeysAPI, etcdDir string) (DataSource, error) {
-	instance := &EtcdDataSource{
+func NewDataSource(kapi etcd.KeysAPI, etcdDir string) (*DataSource, error) {
+	instance := &DataSource{
 		keysAPI: kapi,
 		etcdDir: etcdDir,
 		cache:   cache.New(1*time.Minute, 30*time.Second), // protects against brute force
@@ -30,11 +33,11 @@ func NewEtcdDataSource(kapi etcd.KeysAPI, etcdDir string) (DataSource, error) {
 	return instance, nil
 }
 
-func (ds *EtcdDataSource) ConfigString(name string) string {
+func (ds *DataSource) ConfigString(name string) string {
 	return os.Getenv(fmt.Sprintf("BAHRAM_%s", name))
 }
 
-func (ds *EtcdDataSource) ConfigByteArray(name string) []byte {
+func (ds *DataSource) ConfigByteArray(name string) []byte {
 	base64Value := ds.ConfigString(name)
 	value, err := base64.StdEncoding.DecodeString(base64Value)
 	if err != nil {
@@ -44,26 +47,7 @@ func (ds *EtcdDataSource) ConfigByteArray(name string) []byte {
 	return value
 }
 
-func (ds *EtcdDataSource) CreateUser(emailAddress, uid, inboxAddress string) (User, error) {
-
-	if emailAddress == "" || uid == "" || inboxAddress == "" {
-		return nil, errors.New("emailAddress, uid, and inboxAddress is required.")
-	}
-
-	_, err := ds.UserByEmail(emailAddress)
-	if err == nil {
-		return nil, errors.New("A user with this email already exists")
-	}
-
-	_, err = ds.GroupByEmail(emailAddress)
-	if err == nil {
-		return nil, errors.New("A group with this email already exists")
-	}
-
-	return user(ds, emailAddress, uid, inboxAddress)
-}
-
-func (ds *EtcdDataSource) StoreUser(u User) error {
+func (ds *DataSource) StoreUser(u *User) error {
 	userJSON, err := json.Marshal(u)
 	if err != nil {
 		return err
@@ -80,7 +64,7 @@ func (ds *EtcdDataSource) StoreUser(u User) error {
 	return nil
 }
 
-func (ds *EtcdDataSource) UserByEmail(emailAddress string) (User, error) {
+func (ds *DataSource) UserByEmail(emailAddress string) (*User, error) {
 	// TODO: use ds.cache
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -91,10 +75,10 @@ func (ds *EtcdDataSource) UserByEmail(emailAddress string) (User, error) {
 		return nil, err
 	}
 
-	return userFromNodeValue(ds, response.Node.Value)
+	return userFromNodeValue(response.Node.Value)
 }
 
-func (ds *EtcdDataSource) StoreGroup(g *Group) error {
+func (ds *DataSource) StoreGroup(g *Group) error {
 	groupJSON, err := json.Marshal(g)
 	if err != nil {
 		return err
@@ -111,7 +95,7 @@ func (ds *EtcdDataSource) StoreGroup(g *Group) error {
 	return nil
 }
 
-func (ds *EtcdDataSource) GroupByEmail(emailAddress string) (*Group, error) {
+func (ds *DataSource) GroupByEmail(emailAddress string) (*Group, error) {
 	// TODO: use ds.cache
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -125,6 +109,6 @@ func (ds *EtcdDataSource) GroupByEmail(emailAddress string) (*Group, error) {
 	return groupFromNodeValue(response.Node.Value)
 }
 
-func (ds *EtcdDataSource) Groups() ([]Group, error) {
+func (ds *DataSource) Groups() ([]Group, error) {
 	return nil, nil
 }

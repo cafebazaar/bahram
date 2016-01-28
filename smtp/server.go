@@ -10,6 +10,6 @@ const (
 	debugTag = "SMTP"
 )
 
-func Serve(listenAddr net.TCPAddr, datasource datasource.DataSource) error {
+func Serve(listenAddr net.TCPAddr, datasource *datasource.DataSource) error {
 	return nil
 }

@@ -10,9 +10,7 @@ import (
 	"golang.org/x/crypto/scrypt"
 )
 
-type userImpl struct {
-	ds DataSource
-
+type User struct {
 	Email         string `json:"email,string"`
 	UIDStr        string `json:"uid,string"`
 	InboxAddr     string `json:"inboxAddress,string"`
@@ -31,38 +29,25 @@ type userImpl struct {
 	// Links         []string `json:"birthDate,array,omitempty"`
 }
 
-func userFromNodeValue(ds DataSource, value string) (User, error) {
-	var u userImpl
+func userFromNodeValue(value string) (*User, error) {
+	var u User
 	err := json.Unmarshal([]byte(value), &u)
-	u.ds = ds
 	return &u, err
 }
 
-func user(ds DataSource, emailAddress, uid, inboxAddress string) (User, error) {
-	// TODO Validation?
-	return &userImpl{
-		ds:        ds,
-		Email:     emailAddress,
-		UIDStr:    uid,
-		InboxAddr: inboxAddress,
-		Active:    true,  // default value
-		Admin:     false, // default value
-	}, nil
-}
-
-func (u *userImpl) EmailAddress() string {
+func (u *User) EmailAddress() string {
 	return u.Email
 }
 
-func (u *userImpl) InboxAddress() string {
+func (u *User) InboxAddress() string {
 	return u.InboxAddr
 }
 
-func (u *userImpl) UID() string {
+func (u *User) UID() string {
 	return u.UIDStr
 }
 
-func (u *userImpl) Info() map[string]interface{} {
+func (u *User) Info() map[string]interface{} {
 	return map[string]interface{}{
 		"email":         u.Email,
 		"uid":           u.UIDStr,
@@ -78,7 +63,7 @@ func (u *userImpl) Info() map[string]interface{} {
 	}
 }
 
-func (u *userImpl) UpdateInfo(values map[string]string) error {
+func (u *User) UpdateInfo(values map[string]string) error {
 	enFirstName, ok := values["enFirstName"]
 	if ok {
 		u.EnFirstName = enFirstName
@@ -138,20 +123,20 @@ func (u *userImpl) UpdateInfo(values map[string]string) error {
 	return nil
 }
 
-func (u *userImpl) HasPassword() bool {
+func (u *User) HasPassword() bool {
 	return u.Password != ""
 }
 
-func (u *userImpl) encodePassword(plainPassword string) ([]byte, error) {
-	password, err := scrypt.Key([]byte(plainPassword), u.ds.ConfigByteArray("PASSWORD_SALT"), 16384, 8, 1, 32)
+func (u *User) encodePassword(plainPassword string, salt []byte) ([]byte, error) {
+	password, err := scrypt.Key([]byte(plainPassword), salt, 16384, 8, 1, 32)
 	if err != nil {
 		return nil, err
 	}
 	return password, nil
 }
 
-func (u *userImpl) AcceptsPassword(plainPassword string) bool {
-	encodedInputPassword, err := u.encodePassword(plainPassword)
+func (u *User) AcceptsPassword(plainPassword string, salt []byte) bool {
+	encodedInputPassword, err := u.encodePassword(plainPassword, salt)
 	if err != nil {
 		logging.Debug(debugTag, "Error while encodePassword: %s", err)
 		return false
@@ -175,8 +160,8 @@ func (u *userImpl) AcceptsPassword(plainPassword string) bool {
 	return true
 }
 
-func (u *userImpl) SetPassword(plainPassword string) error {
-	encodedPassword, err := u.encodePassword(plainPassword)
+func (u *User) SetPassword(plainPassword string, salt []byte) error {
+	encodedPassword, err := u.encodePassword(plainPassword, salt)
 	if err != nil {
 		return err
 	}
@@ -184,18 +169,18 @@ func (u *userImpl) SetPassword(plainPassword string) error {
 	return nil
 }
 
-func (u *userImpl) IsActive() bool {
+func (u *User) IsActive() bool {
 	return u.Active
 }
 
-func (u *userImpl) SetActive(active bool) {
+func (u *User) SetActive(active bool) {
 	u.Active = active
 }
 
-func (u *userImpl) IsAdmin() bool {
+func (u *User) IsAdmin() bool {
 	return u.Admin
 }
 
-func (u *userImpl) SetAdmin(admin bool) {
+func (u *User) SetAdmin(admin bool) {
 	u.Admin = admin
 }
