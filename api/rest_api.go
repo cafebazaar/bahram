@@ -22,3 +22,6 @@ func (r *restServerAPI) Me(w grest.ResponseWriter, req *grest.Request) {
 	}
 	w.WriteJson(user.Info())
 }
+
+func (r *restServerAPI) CreateGroup(w grest.ResponseWriter, req *grest.Request) {
+}

@@ -68,6 +68,8 @@ func (r *restServerAPI) MakeHandler() (http.Handler, error) {
 		grest.Post("/login/", r.Login),
 		// Users
 		grest.Get("/me/", r.Me),
+		// Groups
+		grest.Post("/groups/", r.CreateGroup),
 	)
 	if err != nil {
 		return nil, err
