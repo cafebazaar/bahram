@@ -119,7 +119,7 @@ func initVar() {
 	}
 }
 
-func Serve(listenAddr net.TCPAddr, datasource datasource.DataSource) error {
+func Serve(listenAddr net.TCPAddr, datasource *datasource.DataSource) error {
 	initVar()
 
 	addr := listenAddr.String()
@@ -161,9 +161,6 @@ func Serve(listenAddr net.TCPAddr, datasource datasource.DataSource) error {
 		go handleClient(client, datasource)
 		clientId++
 	}
-
-func Serve(listenAddr net.TCPAddr, datasource *datasource.DataSource) error {
-	return nil
 }
 
 func (c *redisClient) redisConnection() (err error) {
@@ -197,21 +194,21 @@ func sendMsg(ns *net.MX, msg ClientMessage) {
 	}
 }
 
-func procMsg(msg ClientMessage, datasource datasource.DataSource) {
+func procMsg(msg ClientMessage, datasource *datasource.DataSource) {
 	rcpt := make([]string, 0, 100)
 
 	toHost := strings.Split(msg.To, "@")[1]
 	if isAllowedHost(toHost) {
 		user, err := datasource.UserByEmail(msg.To)
 		if err == nil {
-			rcpt = append(rcpt, user.InboxAddress())
+			rcpt = append(rcpt, user.InboxAddr)
 		} else {
 			group, err := datasource.GroupByEmail(msg.To)
 			if err == nil {
-				for _, member := range group.MembersList() {
+				for _, member := range group.Members {
 					user, err = datasource.UserByEmail(member)
 					if err == nil {
-						rcpt = append(rcpt, user.InboxAddress())
+						rcpt = append(rcpt, user.InboxAddr)
 					}
 				}
 			} else {
@@ -221,9 +218,11 @@ func procMsg(msg ClientMessage, datasource datasource.DataSource) {
 		}
 	}
 
+	logln(1, fmt.Sprintf("%s", msg.From))
 	fromHost := strings.Split(msg.From, "@")[1]
 	if isAllowedHost(fromHost) {
 		if msg.Auth == false || msg.Username != msg.From {
+			logln(1, fmt.Sprintf("%s %s", msg.Username, msg.From))
 			logln(1, "Not authenticated")
 			return
 		}
@@ -247,7 +246,7 @@ func procMsg(msg ClientMessage, datasource datasource.DataSource) {
 	}
 }
 
-func readFromQueue(datasource datasource.DataSource) {
+func readFromQueue(datasource *datasource.DataSource) {
 	for {
 		r := &redisClient{}
 		redis_err := r.redisConnection()
@@ -320,7 +319,7 @@ func procMail() {
 	}
 }
 
-func clientAuth(client *Client, datasource datasource.DataSource) string {
+func clientAuth(client *Client, datasource *datasource.DataSource) string {
 	succ := "235 Authentication succeeded"
 	fail := "535 Authentication failed"
 
@@ -329,16 +328,16 @@ func clientAuth(client *Client, datasource datasource.DataSource) string {
 		return fail
 	}
 
-	logln(1, user.EmailAddress())
+	logln(1, user.Email)
 	logln(1, client.password)
-	if user.AcceptsPassword(client.password) {
+	if user.AcceptsPassword(client.password, datasource.ConfigByteArray("PASSWORD_SALT")) {
 		client.auth = true
 		return succ
 	}
 	return fail
 }
 
-func handleClient(client *Client, datasource datasource.DataSource) {
+func handleClient(client *Client, datasource *datasource.DataSource) {
 	defer closeClient(client)
 	//	defer closeClient(client)
 	greeting := "220 " + gConfig["GSMTP_HOST_NAME"] +
