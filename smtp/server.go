@@ -329,7 +329,6 @@ func clientAuth(client *Client, datasource *datasource.DataSource) string {
 	}
 
 	logln(1, user.Email)
-	logln(1, client.password)
 	if user.AcceptsPassword(client.password, datasource.ConfigByteArray("PASSWORD_SALT")) {
 		client.auth = true
 		return succ
