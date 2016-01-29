@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/smtp"
 	"regexp"
 	"strconv"
 	"strings"
@@ -63,11 +64,12 @@ type Client struct {
 }
 
 type ClientMessage struct {
-	From    string
-	To      string
-	Data    string
-	Subject string
-	Auth    bool
+	From     string
+	To       string
+	Data     string
+	Subject  string
+	Username string
+	Auth     bool
 }
 
 var gConfig = map[string]string{
@@ -132,7 +134,7 @@ func Serve(listenAddr net.TCPAddr, datasource datasource.DataSource) error {
 	for i := 0; i < 3; i++ {
 		go procMail()
 	}
-	go readFromQueue()
+	go readFromQueue(datasource)
 
 	var clientId int64
 	clientId = 1
@@ -178,7 +180,73 @@ func (c *redisClient) redisConnection() (err error) {
 	return nil
 }
 
-func readFromQueue() {
+func isAllowedHost(host string) bool {
+	if allowed := allowedHosts[host]; !allowed {
+		return false
+	}
+	return true
+}
+
+func sendMsg(ns *net.MX, msg ClientMessage) {
+	err := smtp.SendMail(ns.Host+":25", nil, msg.From, []string{msg.To}, []byte(msg.Data))
+	if err == nil {
+		logln(1, "successfully send message")
+	} else {
+		logln(1, fmt.Sprintf("error in send message: %s", err))
+	}
+}
+
+func procMsg(msg ClientMessage, datasource datasource.DataSource) {
+	rcpt := make([]string, 0, 100)
+
+	toHost := strings.Split(msg.To, "@")[1]
+	if isAllowedHost(toHost) {
+		user, err := datasource.UserByEmail(msg.To)
+		if err == nil {
+			rcpt = append(rcpt, user.InboxAddress())
+		} else {
+			group, err := datasource.GroupByEmail(msg.To)
+			if err == nil {
+				for _, member := range group.MembersList() {
+					user, err = datasource.UserByEmail(member)
+					if err == nil {
+						rcpt = append(rcpt, user.InboxAddress())
+					}
+				}
+			} else {
+				logln(1, "Can't find such user or group")
+				return
+			}
+		}
+	}
+
+	fromHost := strings.Split(msg.From, "@")[1]
+	if isAllowedHost(fromHost) {
+		if msg.Auth == false || msg.Username != msg.From {
+			logln(1, "Not authenticated")
+			return
+		}
+	}
+
+	for _, email := range rcpt {
+		logln(1, email)
+		host := strings.Split(email, "@")[1]
+
+		nss, err := net.LookupMX(host)
+		if err == nil {
+			for _, ns := range nss {
+				logln(1, fmt.Sprintf("%s %d", ns.Host, ns.Pref))
+			}
+			curMsg := msg
+			curMsg.To = email
+			sendMsg(nss[0], curMsg)
+		} else {
+			logln(1, "Error in lookup MX")
+		}
+	}
+}
+
+func readFromQueue(datasource datasource.DataSource) {
 	for {
 		r := &redisClient{}
 		redis_err := r.redisConnection()
@@ -188,7 +256,7 @@ func readFromQueue() {
 				if len(values) > 0 {
 					var msg ClientMessage
 					json.Unmarshal([]byte(values[0]), &msg)
-					logln(1, msg.From)
+					procMsg(msg, datasource)
 				}
 				_, do_err = redis.Strings(r.conn.Do("LPOP", "email_queue"))
 			} else {
@@ -227,11 +295,12 @@ func procMail() {
 		redis_err := redis.redisConnection()
 		if redis_err == nil {
 			msg := &ClientMessage{
-				From:    client.mail_from,
-				To:      client.rcpt_to,
-				Auth:    client.auth,
-				Data:    client.data,
-				Subject: client.subject,
+				From:     client.mail_from,
+				To:       client.rcpt_to,
+				Auth:     client.auth,
+				Data:     client.data,
+				Subject:  client.subject,
+				Username: client.username,
 			}
 			tmp, _ := json.Marshal(msg)
 			_, do_err := redis.conn.Do("RPUSH", "email_queue", tmp)
