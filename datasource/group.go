@@ -10,6 +10,7 @@ type Group struct {
 	Description string   `json:"description"`
 	Active      bool     `json:"active"`
 	Public      bool     `json:"public"`
+	Joinable    bool     `json:"joinable"`
 	Manager     string   `json:"manager"`
 	Members     []string `json:"members"`
 	CCs         []string `json:"ccs"`

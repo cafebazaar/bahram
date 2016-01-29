@@ -12,19 +12,19 @@ type User struct {
 	Email         string `json:"email"`
 	UIDStr        string `json:"uid"`
 	InboxAddr     string `json:"inboxAddress"`
-	Active        bool   `json:"active,bool,omitempty"`
-	Admin         bool   `json:"admin,bool,omitempty"`
-	Password      string `json:"password,omitempty"`
-	EnFirstName   string `json:"enFirstName,omitempty"`
-	EnLastName    string `json:"enLastName,omitempty"`
-	FaFirstName   string `json:"faFirstName,omitempty"`
-	FaLastName    string `json:"faLastName,omitempty"`
-	MobileNum     string `json:"mobileNum,omitempty"`
-	EmergencyNum  string `json:"emergencyNum,omitempty"`
-	BirthDate     uint64 `json:"birthDate,omitempty"`
-	EnrolmentDate uint64 `json:"enrolmentDate,omitempty"`
-	LeavingDate   uint64 `json:"leavingDate,omitempty"`
-	// Links         []string `json:"birthDate,array,omitempty"`
+	Active        bool   `json:"active"`
+	Admin         bool   `json:"admin"`
+	Password      string `json:"password"`
+	EnFirstName   string `json:"enFirstName"`
+	EnLastName    string `json:"enLastName"`
+	FaFirstName   string `json:"faFirstName"`
+	FaLastName    string `json:"faLastName"`
+	MobileNum     string `json:"mobileNum"`
+	EmergencyNum  string `json:"emergencyNum"`
+	BirthDate     uint64 `json:"birthDate"`
+	EnrolmentDate uint64 `json:"enrolmentDate"`
+	LeavingDate   uint64 `json:"leavingDate"`
+	// Links         []string `json:"birthDate"`
 }
 
 func userFromNodeValue(value string) (*User, error) {
@@ -38,6 +38,7 @@ func (u *User) HasPassword() bool {
 }
 
 func (u *User) encodePassword(plainPassword string, salt []byte) ([]byte, error) {
+	// TODO can we encode random salt into encoded password
 	password, err := scrypt.Key([]byte(plainPassword), salt, 16384, 8, 1, 32)
 	if err != nil {
 		return nil, err

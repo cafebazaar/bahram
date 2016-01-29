@@ -49,8 +49,14 @@ func newRestServerAPI(datasource *datasource.DataSource) *restServerAPI {
 				return ""
 			}
 		},
-		Authorizer: func(request *grest.Request) bool {
-			// if request.URL.Path != "/groups"  // TODO
+		Authorizer: func(request *grest.Request, userID string) bool {
+			user, err := datasource.UserByEmail(userID)
+			if err != nil {
+				logging.Log(debugTag, "Couldn't fetch user for userID=%s", userID)
+				return false
+			}
+			request.Env["REMOTE_USER_OBJECT"] = user
+
 			return true
 		},
 	}
@@ -73,6 +79,10 @@ func (r *restServerAPI) MakeHandler() (http.Handler, error) {
 		grest.Post("/login", r.Login),
 		// Users
 		grest.Get("/me", r.Me),
+		grest.Get("/users", r.ListUsers),
+		grest.Get("/users/#email", r.GetUser),
+		grest.Post("/users/#email", r.CreateUser),
+		grest.Put("/users/#email", r.UpdateUser),
 		// Groups
 		grest.Get("/groups", r.ListGroups),
 		grest.Get("/groups/#email", r.GetGroup),

@@ -78,6 +78,34 @@ func (ds *DataSource) UserByEmail(emailAddress string) (*User, error) {
 	return userFromNodeValue(response.Node.Value)
 }
 
+func (ds *DataSource) Users() ([]*User, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	response, err := ds.keysAPI.Get(ctx, fmt.Sprintf("/%s/users", ds.etcdDir), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var users []*User
+
+	errCount := 0
+	for i := range response.Node.Nodes {
+		u, e := userFromNodeValue(response.Node.Nodes[i].Value)
+		if e != nil {
+			errCount += 1
+			logging.Debug(debugTag, "Error while userFromNodeValue: %s", e)
+		} else {
+			users = append(users, u)
+		}
+	}
+
+	if errCount > 0 {
+		return nil, fmt.Errorf("Errors happened while trying to unmarshal %d user(s)", errCount)
+	}
+
+	return users, nil
+}
+
 func (ds *DataSource) StoreGroup(g *Group) error {
 	groupJSON, err := json.Marshal(g)
 	if err != nil {

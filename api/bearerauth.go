@@ -25,7 +25,7 @@ type AuthBearerMiddleware struct {
 	// Callback function that should perform the authorization of the authenticated user.
 	// Must return true on success, false on failure. Optional, defaults to success.
 	// Called only after an authentication success.
-	Authorizer func(request *rest.Request) bool
+	Authorizer func(request *rest.Request, userID string) bool
 }
 
 // MiddlewareFunc makes AuthBearerMiddleware implement the Middleware interface.
@@ -39,7 +39,7 @@ func (mw *AuthBearerMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.Ha
 	}
 
 	if mw.Authorizer == nil {
-		mw.Authorizer = func(request *rest.Request) bool {
+		mw.Authorizer = func(request *rest.Request, userID string) bool {
 			return true
 		}
 	}
@@ -73,7 +73,7 @@ func (mw *AuthBearerMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.Ha
 		}
 
 		// The user's token was valid, but they're not authorized for the current request
-		if !mw.Authorizer(request) {
+		if !mw.Authorizer(request, userID) {
 			mw.unauthorized(writer)
 			return
 		}
@@ -84,7 +84,7 @@ func (mw *AuthBearerMiddleware) MiddlewareFunc(handler rest.HandlerFunc) rest.Ha
 }
 
 func (mw *AuthBearerMiddleware) unauthorized(writer rest.ResponseWriter) {
-	writer.Header().Set("WWW-Authenticate", "Token realm="+mw.Realm)
+	writer.Header().Set("WWW-Authenticate", "Bearer realm="+mw.Realm)
 	rest.Error(writer, "Not Authorized", http.StatusUnauthorized)
 }
 
