@@ -5,14 +5,14 @@ import (
 )
 
 type Group struct {
-	Email       string   `json:"email,string"`
-	Name        string   `json:"name,string"`
-	Description string   `json:"description,string"`
-	Active      bool     `json:"active,bool"`
-	Joinable    bool     `json:"joinable,bool"`
-	Manager     string   `json:"manager,string"`
-	MembersLst  []string `json:"members,array"`
-	CCs         []string `json:"ccs,array"`
+	Email       string   `json:"email"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Active      bool     `json:"active"`
+	Public      bool     `json:"public"`
+	Manager     string   `json:"manager"`
+	Members     []string `json:"members"`
+	CCs         []string `json:"ccs"`
 }
 
 func groupFromNodeValue(value string) (*Group, error) {
@@ -21,10 +21,14 @@ func groupFromNodeValue(value string) (*Group, error) {
 	return &g, err
 }
 
-func (g *Group) EmailAddress() string {
-	return g.Email
-}
-
-func (g *Group) MembersList() []string {
-	return g.MembersLst
+func (g *Group) IsMemeber(email string) bool {
+	if g.Manager == email {
+		return true
+	}
+	for _, m := range g.Members {
+		if m == email {
+			return true
+		}
+	}
+	return false
 }

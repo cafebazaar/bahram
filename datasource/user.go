@@ -3,155 +3,50 @@ package datasource
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
-	"strconv"
 
 	"github.com/cafebazaar/blacksmith/logging"
 	"golang.org/x/crypto/scrypt"
 )
 
-type userImpl struct {
-	ds DataSource
-
-	Email         string `json:"email,string"`
-	UIDStr        string `json:"uid,string"`
-	InboxAddr     string `json:"inboxAddress,string"`
-	Active        bool   `json:"active,bool"`
-	Admin         bool   `json:"admin,bool"`
-	Password      string `json:"password,string"`
-	EnFirstName   string `json:"enFirstName,string,omitempty"`
-	EnLastName    string `json:"enLastName,string,omitempty"`
-	FaFirstName   string `json:"faFirstName,string,omitempty"`
-	FaLastName    string `json:"faLastName,string,omitempty"`
-	MobileNum     string `json:"mobileNum,string,omitempty"`
-	EmergencyNum  string `json:"emergencyNum,string,omitempty"`
-	BirthDate     uint64 `json:"birthDate,string,omitempty"`
-	EnrolmentDate uint64 `json:"enrolmentDate,string,omitempty"`
-	LeavingDate   uint64 `json:"leavingDate,string,omitempty"`
+type User struct {
+	Email         string `json:"email"`
+	UIDStr        string `json:"uid"`
+	InboxAddr     string `json:"inboxAddress"`
+	Active        bool   `json:"active,bool,omitempty"`
+	Admin         bool   `json:"admin,bool,omitempty"`
+	Password      string `json:"password,omitempty"`
+	EnFirstName   string `json:"enFirstName,omitempty"`
+	EnLastName    string `json:"enLastName,omitempty"`
+	FaFirstName   string `json:"faFirstName,omitempty"`
+	FaLastName    string `json:"faLastName,omitempty"`
+	MobileNum     string `json:"mobileNum,omitempty"`
+	EmergencyNum  string `json:"emergencyNum,omitempty"`
+	BirthDate     uint64 `json:"birthDate,omitempty"`
+	EnrolmentDate uint64 `json:"enrolmentDate,omitempty"`
+	LeavingDate   uint64 `json:"leavingDate,omitempty"`
 	// Links         []string `json:"birthDate,array,omitempty"`
 }
 
-func userFromNodeValue(ds DataSource, value string) (User, error) {
-	var u userImpl
+func userFromNodeValue(value string) (*User, error) {
+	var u User
 	err := json.Unmarshal([]byte(value), &u)
-	u.ds = ds
 	return &u, err
 }
 
-func user(ds DataSource, emailAddress, uid, inboxAddress string) (User, error) {
-	// TODO Validation?
-	return &userImpl{
-		ds:        ds,
-		Email:     emailAddress,
-		UIDStr:    uid,
-		InboxAddr: inboxAddress,
-		Active:    true,  // default value
-		Admin:     false, // default value
-	}, nil
-}
-
-func (u *userImpl) EmailAddress() string {
-	return u.Email
-}
-
-func (u *userImpl) InboxAddress() string {
-	return u.InboxAddr
-}
-
-func (u *userImpl) UID() string {
-	return u.UIDStr
-}
-
-func (u *userImpl) Info() map[string]interface{} {
-	return map[string]interface{}{
-		"email":         u.Email,
-		"uid":           u.UIDStr,
-		"enFirstName":   u.EnFirstName,
-		"enLastName":    u.EnLastName,
-		"faFirstName":   u.FaFirstName,
-		"faLastName":    u.FaLastName,
-		"mobileNum":     u.MobileNum,
-		"emergencyNum":  u.EmergencyNum,
-		"birthDate":     u.BirthDate,
-		"enrolmentDate": u.EnrolmentDate,
-		"leavingDate":   u.LeavingDate,
-	}
-}
-
-func (u *userImpl) UpdateInfo(values map[string]string) error {
-	enFirstName, ok := values["enFirstName"]
-	if ok {
-		u.EnFirstName = enFirstName
-	}
-
-	enLastName, ok := values["enLastName"]
-	if ok {
-		u.EnLastName = enLastName
-	}
-
-	faFirstName, ok := values["faFirstName"]
-	if ok {
-		u.FaFirstName = faFirstName
-	}
-
-	faLastName, ok := values["faLastName"]
-	if ok {
-		u.FaLastName = faLastName
-	}
-
-	mobileNum, ok := values["mobileNum"]
-	if ok {
-		u.MobileNum = mobileNum
-	}
-
-	emergencyNum, ok := values["emergencyNum"]
-	if ok {
-		u.EmergencyNum = emergencyNum
-	}
-
-	var err error
-
-	birthDateStr, ok := values["birthDate"]
-	if ok {
-		u.BirthDate, err = strconv.ParseUint(birthDateStr, 10, 64)
-		if err != nil {
-			return fmt.Errorf("error while parsing birthDate: %s", err)
-		}
-	}
-
-	enrolmentDateStr, ok := values["enrolmentDate"]
-	if ok {
-		u.EnrolmentDate, err = strconv.ParseUint(enrolmentDateStr, 10, 64)
-		if err != nil {
-			return fmt.Errorf("error while parsing enrolmentDate: %s", err)
-		}
-	}
-
-	leavingDateStr, ok := values["leavingDate"]
-	if ok {
-		u.LeavingDate, err = strconv.ParseUint(leavingDateStr, 10, 64)
-		if err != nil {
-			return fmt.Errorf("error while parsing leavingDate: %s", err)
-		}
-	}
-
-	return nil
-}
-
-func (u *userImpl) HasPassword() bool {
+func (u *User) HasPassword() bool {
 	return u.Password != ""
 }
 
-func (u *userImpl) encodePassword(plainPassword string) ([]byte, error) {
-	password, err := scrypt.Key([]byte(plainPassword), u.ds.ConfigByteArray("PASSWORD_SALT"), 16384, 8, 1, 32)
+func (u *User) encodePassword(plainPassword string, salt []byte) ([]byte, error) {
+	password, err := scrypt.Key([]byte(plainPassword), salt, 16384, 8, 1, 32)
 	if err != nil {
 		return nil, err
 	}
 	return password, nil
 }
 
-func (u *userImpl) AcceptsPassword(plainPassword string) bool {
-	encodedInputPassword, err := u.encodePassword(plainPassword)
+func (u *User) AcceptsPassword(plainPassword string, salt []byte) bool {
+	encodedInputPassword, err := u.encodePassword(plainPassword, salt)
 	if err != nil {
 		logging.Debug(debugTag, "Error while encodePassword: %s", err)
 		return false
@@ -175,27 +70,11 @@ func (u *userImpl) AcceptsPassword(plainPassword string) bool {
 	return true
 }
 
-func (u *userImpl) SetPassword(plainPassword string) error {
-	encodedPassword, err := u.encodePassword(plainPassword)
+func (u *User) SetPassword(plainPassword string, salt []byte) error {
+	encodedPassword, err := u.encodePassword(plainPassword, salt)
 	if err != nil {
 		return err
 	}
 	u.Password = base64.StdEncoding.EncodeToString(encodedPassword)
 	return nil
-}
-
-func (u *userImpl) IsActive() bool {
-	return u.Active
-}
-
-func (u *userImpl) SetActive(active bool) {
-	u.Active = active
-}
-
-func (u *userImpl) IsAdmin() bool {
-	return u.Admin
-}
-
-func (u *userImpl) SetAdmin(admin bool) {
-	u.Admin = admin
 }
