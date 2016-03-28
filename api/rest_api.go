@@ -11,6 +11,8 @@ import (
 ///////////////
 // Users //////
 
+//func sendResetPassword()
+
 // Returns information about current user
 func (r *restServerAPI) Me(w grest.ResponseWriter, req *grest.Request) {
 	w.WriteJson(req.Env["REMOTE_USER_OBJECT"])
@@ -247,6 +249,8 @@ func (r *restServerAPI) CreateGroup(w grest.ResponseWriter, req *grest.Request) 
 		grest.Error(w, "Access denied", http.StatusForbidden)
 		return
 	}
+
+	// TODO check allowed domains
 
 	var g datasource.Group
 	err := req.DecodeJsonPayload(&g)
